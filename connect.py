@@ -27,9 +27,38 @@ class Connect(object):
 		data = ''
 		for a in digest:
 			data += '%02x'%ord(a)
-		
 		self.dpSocket = socket(AF_INET, SOCK_STREAM)
 		self.dpSocket.connect((self.dpHost, self.dpPort))
 		data = "%s %s MD5 3.871 UTF8"%(self.id, data)
 		self.dpSocket.send('LSIN 1 %s\r\n'%data)
+		data = self.dpSocket.recv(1024)
+		self.dpSocket.send('CONF 2 0 0\r\n')
+		count = 1
+		totalLen = 0
+		#CONF 2 4481 7870
+		size = 0
+		while True:
+			data = self.dpSocket.recv(8192)
+			if count == 1:
+				prefixsize = data.find('\r\n')+2
+				tokens = data.split()
+				print "%s %s %d %d"%(tokens[2], tokens[3], int(tokens[3])+prefixsize, prefixsize)
+				size = int(tokens[3])+prefixsize
+			totalsize = len(data)
+			pos = -1
+			tmp = data.find('\r\n')
+			while tmp!=-1:
+				pos = tmp
+				tmp = data.find('\r\n', pos+1)
+			totalLen+=totalsize
+			print "%d %d/%d:%d\n"%(count, pos, totalsize, totalLen)
+			webmemo_version=4
+			count+=1
+			
+			if size == totalLen:
+				break
+			
+			
+		
+		self.dpSocket.send('GLST 3 0\r\n')
 		print self.dpSocket.recv(1024)
