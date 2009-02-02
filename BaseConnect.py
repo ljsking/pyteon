@@ -15,19 +15,11 @@ class BaseConnect(object):
 		self.receive()
 		
 	def receive(self):
-		data = ''
-		self.counting = 0
-		data += self.socket.recv(1024)
-		tokens = data.split('\r\n')
-		for idx in range(0, len(tokens)-1):
-			self.parseCommandLine(tokens[idx])
-		data = tokens[len(tokens)-1]
-		
-	def parseCommandLine(self, commandLine):
-		tokens = commandLine.split()
-		command = tokens[0]
+		data = self.socket.recv(1024)
+		command = data[:data.find(" ")]
 		try:
 			method = self.__getattribute__("got"+command)
-			method(tokens)
+			method(data)
 		except AttributeError:
-			print commandLine
+			print data
+		

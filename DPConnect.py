@@ -21,5 +21,20 @@ class DPConnect(BaseConnect):
 			data += '%02x'%ord(a)
 		return data
 		
-	def gotLSIN(self, tokens):
+	def gotLSIN(self, data):
 		self.send('CONF', '0 0\r\n')
+		
+	def gotCONF(self, data):
+		tokens = data.split()
+		prefixsize = data.find('\r\n')+2
+		originalSize = int(tokens[3])+prefixsize
+		receivedSize = len(data)
+		while originalSize > receivedSize:
+			data = self.socket.recv(1024)
+			receivedSize += len(data)
+			#print "%d/%d\n"%(receivedSize, originalSize)
+			
+		self.send('GLST', '3 0\r\n')
+		
+	def gotGLST(self, data):
+		print 'got GLST'

@@ -10,12 +10,13 @@ class DPLConnect(BaseConnect):
 		super(DPLConnect, self).connect()
 		self.send('PVER', '3.871 3.0 ko.linux\r\n')
 			
-	def gotPVER(self, tokens):
+	def gotPVER(self, data):
 		self.send('AUTH', 'AUTH\r\n')
 		
-	def gotAUTH(self, tokens):
+	def gotAUTH(self, data):
 		self.send('REQS', 'DES %s\r\n'%(self.id))
 		
-	def gotREQS(self, tokens):
+	def gotREQS(self, data):
+		tokens = data.split()
 		self.connected(tokens[3], int(tokens[4]))
 		
