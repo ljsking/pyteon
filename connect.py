@@ -42,7 +42,7 @@ class Connect(object):
 			if count == 1:
 				prefixsize = data.find('\r\n')+2
 				tokens = data.split()
-				print "%s %s %d %d"%(tokens[2], tokens[3], int(tokens[3])+prefixsize, prefixsize)
+				#print "%s %s %d %d"%(tokens[2], tokens[3], int(tokens[3])+prefixsize, prefixsize)
 				size = int(tokens[3])+prefixsize
 			totalsize = len(data)
 			pos = -1
@@ -51,14 +51,16 @@ class Connect(object):
 				pos = tmp
 				tmp = data.find('\r\n', pos+1)
 			totalLen+=totalsize
-			print "%d %d/%d:%d\n"%(count, pos, totalsize, totalLen)
+			#print "%d %d/%d:%d\n"%(count, pos, totalsize, totalLen)
 			webmemo_version=4
 			count+=1
 			
 			if size == totalLen:
 				break
-			
-			
 		
 		self.dpSocket.send('GLST 3 0\r\n')
-		print self.dpSocket.recv(1024)
+ 		'''print self.dpSocket.recv(8192)
+		print "\n\n\n"
+		print self.dpSocket.recv(8192)
+		print "\n\n\n"
+		print self.dpSocket.recv(8192)'''

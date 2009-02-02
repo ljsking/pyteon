@@ -1,13 +1,19 @@
 import unittest
 from connect import *
+from DPLConnect import *
 class TestSequenceFunctions(unittest.TestCase):
 	def setUp(self):
 		self.con = Connect('ljsking@netsgo.com','rjseka')
 
+	def connected(self, ip, port):
+		self.ip = ip
+		self.port = port
+		
 	def testConnectToDPL(self):
-		self.con.connectToDPL()
-		self.assertTrue(self.con.dpHost!=None)
-		self.assertTrue(self.con.dpPort!=None)
+		dplConnect = DPLConnect('ljsking@netsgo.com', self.connected)
+		dplConnect.connect()
+		self.assertNotEqual(None, self.ip)
+		self.assertNotEqual(None, self.port)
 		
 	def testTokenize(self):
 		self.assertEqual('ljsking', 'ljsking@netsgo.com'.split('@')[0])
@@ -24,6 +30,55 @@ class TestSequenceFunctions(unittest.TestCase):
 	def testConnectToDP(self):
 		self.con.connectToDPL()
 		self.con.connectToDP()
+		
+	def testParseByNewLine(self):
+		data = 'test\r\ntest'
+		tokens = data.split('\r\n')
+		self.assertEqual(2, len(tokens))
+		data = 'test\r\ntest\r\n'
+		tokens = data.split('\r\n')
+		self.assertEqual(3, len(tokens))
+		self.assertEqual('', tokens[2])
+		
+	def getData(self):
+		self.counting+=1
+		if 1 == self.counting:
+			return 'AUTH 2 AUTH\r\ntest'
+		elif 2 == self.counting:
+			return '2\r\ntest3\r\n'
+		elif 3 == self.counting:
+			return 'test4\r\ntest5\r\n'
+		else:
+			return
+			
+	def parseReceiveData(self):
+		data = ''
+		self.counting = 0
+		while(True):
+			data += self.getData()
+			tokens = data.split('\r\n')
+			for idx in range(0, len(tokens)-1):
+				self.parseCommand(tokens[idx])
+			data = tokens[len(tokens)-1]
+			if 3==self.counting:
+				break
+				
+	def gotAUTH(self, tokens):
+		self.gotAuth = True
+	
+	def parseCommand(self, commandLine):
+		tokens = commandLine.split()
+		command = tokens[0]
+		try:
+			method = self.__getattribute__("got"+command)
+			method(tokens)
+		except AttributeError:
+			pass
+			
+	def testReceive(self):
+		self.gotAuth = False
+		self.parseReceiveData()
+		self.assertTrue(self.gotAuth)
 		
 if __name__ == '__main__':
     unittest.main()
