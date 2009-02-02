@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*- 
 from BaseConnect import *
 import md5
 		
@@ -40,7 +41,6 @@ class DPConnect(BaseConnect):
 		tokens = lines[0].split()
 		lines = lines[1:]
 		groupSize = int(tokens[2])
-		lastGroup = 0
 		done = False
 		while not done:
 			for line in lines[:-1]:
@@ -53,4 +53,19 @@ class DPConnect(BaseConnect):
 			if not done:
 				data =lines[-1]+self.socket.recv(1024)
 			 	lines = data.split('\r\n')
-			
+		self.send('LIST', '\r\n')
+		
+	def gotLIST(self, data):
+		lines = data.split('\r\n')
+		done = False
+		while not done:
+			for line in lines[:-1]:
+				tokens = line.split()
+				start = int(tokens[2])
+				end = int(tokens[3])
+				done = start+1==end
+				if done:
+					break
+			if not done:
+				data =lines[-1]+self.socket.recv(1024)
+			 	lines = data.split('\r\n')

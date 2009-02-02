@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*- 
 import unittest
 from Connect import *
 from DPLConnect import *
@@ -87,5 +88,3 @@ class TestSequenceFunctions(unittest.TestCase):
 		
 if __name__ == '__main__':
     unittest.main()
-
-#sendCommand( "PVER", "" )
