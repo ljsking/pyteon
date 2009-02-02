@@ -1,7 +1,10 @@
 import unittest
-from connect import *
+from Connect import *
 from DPLConnect import *
+from DPConnect import *
 class TestSequenceFunctions(unittest.TestCase):
+	id = "ljsking@netsgo.com"
+	password = "rjseka"
 	def setUp(self):
 		self.con = Connect('ljsking@netsgo.com','rjseka')
 
@@ -10,7 +13,7 @@ class TestSequenceFunctions(unittest.TestCase):
 		self.port = port
 		
 	def testConnectToDPL(self):
-		dplConnect = DPLConnect('ljsking@netsgo.com', self.connected)
+		dplConnect = DPLConnect(self.id, self.connected)
 		dplConnect.connect()
 		self.assertNotEqual(None, self.ip)
 		self.assertNotEqual(None, self.port)
@@ -28,8 +31,10 @@ class TestSequenceFunctions(unittest.TestCase):
 		self.assertEqual(32, len(data))
 		
 	def testConnectToDP(self):
-		self.con.connectToDPL()
-		self.con.connectToDP()
+		dplConnect = DPLConnect(self.id, self.connected)
+		dplConnect.connect()
+		dpConnect = DPConnect(self.id, self.password, self.ip, self.port)
+		dpConnect.connect()
 		
 	def testParseByNewLine(self):
 		data = 'test\r\ntest'
