@@ -33,8 +33,24 @@ class DPConnect(BaseConnect):
 			data = self.socket.recv(1024)
 			receivedSize += len(data)
 			#print "%d/%d\n"%(receivedSize, originalSize)
-			
 		self.send('GLST', '3 0\r\n')
 		
 	def gotGLST(self, data):
-		print 'got GLST'
+		lines = data.split('\r\n')
+		tokens = lines[0].split()
+		lines = lines[1:]
+		groupSize = int(tokens[2])
+		lastGroup = 0
+		done = False
+		while not done:
+			for line in lines[:-1]:
+				tokens = line.split()
+				start = int(tokens[2])
+				end = int(tokens[3])
+				done = start+1==end
+				if done:
+					break
+			if not done:
+				data =lines[-1]+self.socket.recv(1024)
+			 	lines = data.split('\r\n')
+			
