@@ -1,9 +1,10 @@
 from socket import *
 class BaseConnect(object):
-	def __init__(self, ip, port):
+	def __init__(self, ip, port, client):
 		self.seq = 0
 		self.ip = ip
 		self.port = port
+		self.client = client
 		
 	def connect(self):
 		self.socket = socket(AF_INET, SOCK_STREAM)

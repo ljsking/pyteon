@@ -1,10 +1,9 @@
 from BaseConnect import *
+from DPConnect import *
 
 class DPLConnect(BaseConnect):
-	def __init__(self, id, connected):
-		super(DPLConnect, self).__init__('dpl.nate.com', 5004)
-		self.id = id
-		self.connected = connected
+	def __init__(self, client):
+		super(DPLConnect, self).__init__('dpl.nate.com', 5004, client)
 		
 	def connect(self):
 		super(DPLConnect, self).connect()
@@ -14,9 +13,11 @@ class DPLConnect(BaseConnect):
 		self.send('AUTH', 'AUTH\r\n')
 		
 	def gotAUTH(self, data):
-		self.send('REQS', 'DES %s\r\n'%(self.id))
+		self.send('REQS', 'DES %s\r\n'%(self.client.id))
 		
 	def gotREQS(self, data):
 		tokens = data.split()
-		self.connected(tokens[3], int(tokens[4]))
-		
+		ip = tokens[3]
+		port = int(tokens[4])
+		self.client.dpConnect = DPConnect(ip, port, self.client)
+		self.client.dpConnect.connect()
