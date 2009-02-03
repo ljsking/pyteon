@@ -16,7 +16,8 @@ from DPLConnect import *
 
 class PyteOn:
 	def __init__(self):
-		pass
+		self.groups = {}
+		self.buddies = {}
 	def connect(self, id, password):
 		self.id = id
 		self.password = password
@@ -30,6 +31,8 @@ class PyteOnTests(unittest.TestCase):
 	def testConnect(self):
 		pyteOn = PyteOn()
 		pyteOn.connect('ljsking@netsgo.com', 'rjseka')
+		self.assertEqual(6, len(pyteOn.groups))
+		print pyteOn.buddies
 
 if __name__ == '__main__':
 	unittest.main()

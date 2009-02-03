@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 from BaseConnect import *
+from Buddy import *
 import md5
 		
 class DPConnect(BaseConnect):
@@ -44,8 +45,9 @@ class DPConnect(BaseConnect):
 			for line in lines[:-1]:
 				tokens = line.split()
 				if tokens[4] == 'Y':
-					tokens[6]=unicode(tokens[6],'utf-8')
-					print tokens[6]
+					gourpName=unicode(tokens[6],'utf-8')
+					id = int(tokens[5])
+					self.client.groups[id]=gourpName
 				start = int(tokens[2])
 				end = int(tokens[3])
 				done = start+1==end
@@ -62,9 +64,17 @@ class DPConnect(BaseConnect):
 		while not done:
 			for line in lines[:-1]:
 				tokens = line.split()
+				groupID = int(tokens[4])
+				email = tokens[5]
+				name = unicode(tokens[7],'utf-8')
+				nick = unicode(tokens[8],'utf-8')
+				id = int(tokens[6])
+				self.client.buddies[id]=Buddy(name,nick,email,groupID)
+				
 				start = int(tokens[2])
 				end = int(tokens[3])
 				done = start+1==end
+				
 				if done:
 					break
 			if not done:
