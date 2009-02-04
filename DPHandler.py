@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 # encoding: utf-8
-from BaseConnect import *
+from BaseHandler import *
 from Buddy import *
 import md5
 		
-class DPConnect(BaseConnect):
+class DPHandler(BaseHandler):
 	def __init__(self, ip, port, client):
-		super(DPConnect, self).__init__(ip, port, client)
+		BaseHandler.__init__(self, ip, port, client)
 		
-	def connect(self):
-		super(DPConnect, self).connect()
+	def connected(self):
 		self.send('LSIN', "%s %s MD5 3.871 UTF8\r\n"%(self.client.id, self.digest()))
 		
 	def digest(self):
