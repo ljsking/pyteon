@@ -3,10 +3,11 @@ from DPConnect import *
 
 class DPLConnect(BaseConnect):
 	def __init__(self, client):
-		super(DPLConnect, self).__init__('dpl.nate.com', 5004, client)
+		BaseConnect.__init__(self,'dpl.nate.com', 5004, client)
+		#super(DPLConnect, self).__init__('dpl.nate.com', 5004, client)
 		
-	def connect(self):
-		super(DPLConnect, self).connect()
+	def connectToServer(self):
+		BaseConnect.connectToServer(self)
 		self.send('PVER', '3.871 3.0 ko.linux\r\n')
 			
 	def gotPVER(self, data):
