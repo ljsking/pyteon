@@ -10,9 +10,14 @@ Copyright (c) 2009 ljsking. All rights reserved.
 import sys
 import os
 import unittest
+import asyncore
+import socket
+import logging
 
-from DPConnect import *
-from DPLConnect import *
+from DPHandler import *
+from DPLHandler import *
+
+logging.basicConfig(level=logging.DEBUG, format="%(created)-15s %(levelname)8s %(thread)d %(name)s %(message)s")
 
 class PyteOn:
 	def __init__(self):
@@ -21,8 +26,10 @@ class PyteOn:
 	def connect(self, id, password):
 		self.id = id
 		self.password = password
-		self.dplConnect = DPLConnect(self)
-		self.dplConnect.connect()
+		s = socket(AF_INET, SOCK_STREAM)
+		s.connect(('dpl.nate.com', 5004))
+		dplHandler = DPLHandler(s, self)
+		asyncore.loop()
 
 class PyteOnTests(unittest.TestCase):
 	def setUp(self):
@@ -31,8 +38,6 @@ class PyteOnTests(unittest.TestCase):
 	def testConnect(self):
 		pyteOn = PyteOn()
 		pyteOn.connect('ljsking@netsgo.com', 'rjseka')
-		self.assertEqual(6, len(pyteOn.groups))
-		print pyteOn.buddies
 
 if __name__ == '__main__':
 	unittest.main()

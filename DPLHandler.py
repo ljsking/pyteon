@@ -2,42 +2,42 @@ import sys
 import os
 import unittest
 import asyncore
+import logging
 
 from BaseHandler import *
-from MockClient import *
+from socket import *
 from DPHandler import *
 
+log						= logging.getLogger(__name__)
+
 class DPLHandler(BaseHandler):
-	def __init__(self, client):
-		BaseHandler.__init__(self,'dpl.nate.com', 5004, client)
+	def __init__(self, conn_sock, client):
+		BaseHandler.__init__(self, conn_sock, client)
+		self.send_data('PVER', '3.871 3.0 ko.linux')
 		
-	def connected(self):
-		self.send('PVER', '3.871 3.0 ko.linux\r\n')
-			
+	def found_terminator(self):
+		data = self.ibuffer
+		self.ibuffer = ''
+		command = data[:data.find(" ")]
+		log.debug("command is " + command)
+		method = 'got' + command
+		if hasattr(self,method):
+			getattr(self,method)(data)
+		
 	def gotPVER(self, data):
-		self.send('AUTH', 'AUTH\r\n')
+		log.debug("call gotPVER")
+		self.send_data('AUTH', 'AUTH')
 		
 	def gotAUTH(self, data):
-		self.send('REQS', 'DES %s\r\n'%(self.client.id))
+		log.debug("call gotAUTH")
+		self.send_data('REQS', 'DES %s'%self.client.id)
 		
 	def gotREQS(self, data):
-		tokens = data.split()
-		ip = tokens[3]
-		port = int(tokens[4])
-		self.client.dpConnection = Connection(DPHandler(ip, port, self.client))
-		self.client.dpConnection.connectToServer()
+		log.debug("call gotREQS")
 		
-class DPLConnectTests(unittest.TestCase):
-	def setUp(self):
-		pass
-
-	def testConnect(self):
-		handler = DPLHandler(MockClient())
-		connection = Connection(handler)
-		connection.connectToServer()
-		asyncore.loop()
-		#self.assertEqual(6, len(pyteOn.groups))
-		#print pyteOn.buddies
-
-if __name__ == '__main__':
-	unittest.main()
+		tokens = data.split()
+		host = tokens[3]
+		port = int(tokens[4])
+		s = socket(AF_INET, SOCK_STREAM)
+		s.connect((host, port))
+		handler = DPHandler(s, self.client)

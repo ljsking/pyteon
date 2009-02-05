@@ -15,13 +15,5 @@ class MockClient:
 	id = "ljsking@netsgo.com"
 	password = "rjseka"
 	def __init__(self):
-		pass
-
-
-class MockClientTests(unittest.TestCase):
-	def setUp(self):
-		pass
-
-
-if __name__ == '__main__':
-	unittest.main()
+		self.groups = {}
+		self.buddies = {}
