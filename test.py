@@ -1,90 +1,164 @@
-# -*- coding: utf-8 -*- 
-import unittest
-from Connect import *
-from DPLConnect import *
-from DPConnect import *
-class TestSequenceFunctions(unittest.TestCase):
-	id = "ljsking@netsgo.com"
-	password = "rjseka"
-	def setUp(self):
-		self.con = Connect('ljsking@netsgo.com','rjseka')
+import asynchat, asyncore, socket
+import logging, md5
 
-	def connected(self, ip, port):
-		self.ip = ip
-		self.port = port
+logging.basicConfig(level=logging.DEBUG, format="%(created)-15s %(levelname)8s %(thread)d %(name)s %(message)s")
+log						= logging.getLogger(__name__)
+
+class Connection(asyncore.dispatcher):
+	def __init__(self, handlerClass):
+		asyncore.dispatcher.__init__(self)
+		self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.seq = 0
+		self.handlerClass = handlerClass
+	
+	def connectToServer(self, host, port):
+		self.connect( (host, port) )
+
+	def handle_connect(self):
+		pass
+
+	def handle_close(self):
+		self.close()
+		print "closed"
+
+	def handle_read(self):
+		self.handlerClass(self)
+
+	def writable(self):
+		return (len(self.sendBuffer) > 0)
+
+	def handle_write(self):
+		sent = self.send(self.sendBuffer)
+		self.sendBuffer = self.sendBuffer[sent:]
+
+	def sendCommand(self, command, arg):
+		self.sendBuffer = '%s %d %s'%(command, self.seq, arg)
+		self.seq += 1
 		
-	def testConnectToDPL(self):
-		dplConnect = DPLConnect(self.id, self.connected)
-		dplConnect.connect()
-		self.assertNotEqual(None, self.ip)
-		self.assertNotEqual(None, self.port)
+class DPLHandler(asynchat.async_chat):
+	
+	LINE_TERMINATOR		= "\r\n"
+	
+	def __init__(self, conn_sock):
+		asynchat.async_chat.__init__(self, conn_sock)
+		self.ibuffer			= []
+		self.set_terminator(self.LINE_TERMINATOR)
+
+	
+	def collect_incoming_data(self, data):
+		log.debug("collect_incoming_data: [%s]" % data)
+		self.ibuffer.append(data)
+
+	
+	def found_terminator(self):
+		log.debug("found_terminator")
+		line = self.ibuffer[0]
+		command = line.split()[0]
+		log.debug("command is " + command)
+		method = 'got' + command
+		if hasattr(self,method):
+			getattr(self,method)()
+		self.ibuffer = self.ibuffer[1:]
+			
+	def gotPVER(self):
+		log.debug("call gotPVER")
+		#self.sendCommand('AUTH', 'AUTH\r\n')
+		self.send_data('AUTH 1 AUTH')
+		#self.ibuffer = []
 		
-	def testTokenize(self):
-		self.assertEqual('ljsking', 'ljsking@netsgo.com'.split('@')[0])
+	def gotAUTH(self):
+		log.debug("call gotAUTH")
+		#self.sendCommand('AUTH', 'AUTH\r\n')
+		self.send_data('REQS 2 DES ljsking@netsgo.com')
+		#self.ibuffer = []
+		
+	def gotREQS(self):
+		log.debug("call gotREQS")
+		tokens = self.ibuffer[0].split()
+		log.debug(tokens)
+		host = tokens[3]
+		port = int(tokens[4])
+		c=Connection(DPHandler)
+		c.connectToServer(host, port)
+		c.sendCommand('LSIN', '%s %s MD5 3.871 UTF8\r\n'%('ljsking@netsgo.com', self.digest()))
+
+	def digest(self):
 		m = md5.new()
-		m.update("rjseka")
-		m.update("ljsking")
+		m.update('rjseka')
+		m.update('ljsking@netsgo.com')
 		digest = m.digest()
-		self.assertEqual(16, len(digest))
 		data = ''
 		for a in digest:
 			data += '%02x'%ord(a)
-		self.assertEqual(32, len(data))
+		return data
 		
-	def testConnectToDP(self):
-		dplConnect = DPLConnect(self.id, self.connected)
-		dplConnect.connect()
-		dpConnect = DPConnect(self.id, self.password, self.ip, self.port)
-		dpConnect.connect()
-		
-	def testParseByNewLine(self):
-		data = 'test\r\ntest'
-		tokens = data.split('\r\n')
-		self.assertEqual(2, len(tokens))
-		data = 'test\r\ntest\r\n'
-		tokens = data.split('\r\n')
-		self.assertEqual(3, len(tokens))
-		self.assertEqual('', tokens[2])
-		
-	def getData(self):
-		self.counting+=1
-		if 1 == self.counting:
-			return 'AUTH 2 AUTH\r\ntest'
-		elif 2 == self.counting:
-			return '2\r\ntest3\r\n'
-		elif 3 == self.counting:
-			return 'test4\r\ntest5\r\n'
-		else:
-			return
-			
-	def parseReceiveData(self):
-		data = ''
-		self.counting = 0
-		while(True):
-			data += self.getData()
-			tokens = data.split('\r\n')
-			for idx in range(0, len(tokens)-1):
-				self.parseCommand(tokens[idx])
-			data = tokens[len(tokens)-1]
-			if 3==self.counting:
-				break
-				
-	def gotAUTH(self, tokens):
-		self.gotAuth = True
+	def send_data(self, data):
+		log.debug("sending: [%s]" % data)
+		self.push(data+self.LINE_TERMINATOR)
 	
-	def parseCommand(self, commandLine):
-		tokens = commandLine.split()
-		command = tokens[0]
-		try:
-			method = self.__getattribute__("got"+command)
-			method(tokens)
-		except AttributeError:
-			pass
-			
-	def testReceive(self):
-		self.gotAuth = False
-		self.parseReceiveData()
-		self.assertTrue(self.gotAuth)
+	def handle_close(self):
+		log.info("conn_closed")
+		#asynchat.async_chat.handle_close(self)
+
+class DPHandler(asynchat.async_chat):
+
+	LINE_TERMINATOR		= "\r\n"
+
+	def __init__(self, conn_sock):
+		asynchat.async_chat.__init__(self, conn_sock)
+		self.ibuffer			= []
+		self.set_terminator(self.LINE_TERMINATOR)
+		self.handler = ''
+
+	def collect_incoming_data(self, data):
+		#log.debug("collect_incoming_data: [%s]" % data)
+		self.ibuffer.append(data)
+
+	def found_terminator(self):
+		if self.handler != '':
+			log.debug("found_terminator with handler")
+			method = self.handler
+			self.handler = ''
+			data = ''.join(self.ibuffer)
+			self.set_terminator(self.LINE_TERMINATOR)
+			self.ibuffer = []
+		else:
+			log.debug("found_terminator")
+			data = self.ibuffer[0]
+			self.ibuffer=self.ibuffer[1:]
+			command = data[:data.find(" ")]
+			method = 'got' + command
+			if command == 'CONF':
+				self.handler = 'got'+command
+				tokens = data.split()
+				self.set_terminator(int(tokens[3]))
 		
-if __name__ == '__main__':
-    unittest.main()
+		if self.handler == '':
+			if hasattr(self,method):
+				getattr(self,method)(data)
+			else:
+				log.debug("No has attribute: %s" % method)
+			
+	def gotLSIN(self, data):
+		log.debug('gotLSIN')
+		self.send_data('CONF 1 0 0')
+		
+	def gotCONF(self, data):
+		log.debug("gotCONF with ")
+		log.debug(unicode(data,'utf-8'))
+
+	def send_data(self, data):
+		log.debug("sending: [%s]" % data)
+		self.push(data+self.LINE_TERMINATOR)
+
+	def handle_close(self):
+		log.info("conn_closed")
+		#asynchat.async_chat.handle_close(self)
+class Runner(object):
+	def __init__(self):
+		c=Connection(DPLHandler)
+		c.connectToServer('dpl.nate.com', 5004)
+		c.sendCommand('PVER', '3.871 3.0 ko.linux\r\n')
+		asyncore.loop()
+
+runner = Runner()
