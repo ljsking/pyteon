@@ -1,41 +1,11 @@
-import asynchat, asyncore, socket
+import asynchat, asyncore
 import logging, md5
+from socket import *
 
 logging.basicConfig(level=logging.DEBUG, format="%(created)-15s %(levelname)8s %(thread)d %(name)s %(message)s")
 log						= logging.getLogger(__name__)
 
-class Connection(asyncore.dispatcher):
-	def __init__(self, handlerClass):
-		asyncore.dispatcher.__init__(self)
-		self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.seq = 0
-		self.handlerClass = handlerClass
-	
-	def connectToServer(self, host, port):
-		self.connect( (host, port) )
-
-	def handle_connect(self):
-		pass
-
-	def handle_close(self):
-		self.close()
-		print "closed"
-
-	def handle_read(self):
-		self.handlerClass(self)
-
-	def writable(self):
-		return (len(self.sendBuffer) > 0)
-
-	def handle_write(self):
-		sent = self.send(self.sendBuffer)
-		self.sendBuffer = self.sendBuffer[sent:]
-
-	def sendCommand(self, command, arg):
-		self.sendBuffer = '%s %d %s'%(command, self.seq, arg)
-		self.seq += 1
-		
-class DPLHandler(asynchat.async_chat):
+class BaseHandler(asynchat.async_chat):
 	
 	LINE_TERMINATOR		= "\r\n"
 	
@@ -43,13 +13,23 @@ class DPLHandler(asynchat.async_chat):
 		asynchat.async_chat.__init__(self, conn_sock)
 		self.ibuffer			= []
 		self.set_terminator(self.LINE_TERMINATOR)
-
 	
 	def collect_incoming_data(self, data):
-		log.debug("collect_incoming_data: [%s]" % data)
 		self.ibuffer.append(data)
-
 	
+	def send_data(self, data):
+		log.debug("sending: [%s]" % data)
+		self.push(data+self.LINE_TERMINATOR)
+
+	def handle_close(self):
+		log.info("conn_closed")
+		asynchat.async_chat.handle_close(self)
+		
+class DPLHandler(BaseHandler):
+	def __init__(self, conn_sock):
+		BaseHandler.__init__(self, conn_sock)
+		self.send_data('PVER 0 3.871 3.0 ko.linux')
+		
 	def found_terminator(self):
 		log.debug("found_terminator")
 		line = self.ibuffer[0]
@@ -59,18 +39,14 @@ class DPLHandler(asynchat.async_chat):
 		if hasattr(self,method):
 			getattr(self,method)()
 		self.ibuffer = self.ibuffer[1:]
-			
+		
 	def gotPVER(self):
 		log.debug("call gotPVER")
-		#self.sendCommand('AUTH', 'AUTH\r\n')
 		self.send_data('AUTH 1 AUTH')
-		#self.ibuffer = []
 		
 	def gotAUTH(self):
 		log.debug("call gotAUTH")
-		#self.sendCommand('AUTH', 'AUTH\r\n')
 		self.send_data('REQS 2 DES ljsking@netsgo.com')
-		#self.ibuffer = []
 		
 	def gotREQS(self):
 		log.debug("call gotREQS")
@@ -78,10 +54,20 @@ class DPLHandler(asynchat.async_chat):
 		log.debug(tokens)
 		host = tokens[3]
 		port = int(tokens[4])
-		c=Connection(DPHandler)
-		c.connectToServer(host, port)
-		c.sendCommand('LSIN', '%s %s MD5 3.871 UTF8\r\n'%('ljsking@netsgo.com', self.digest()))
+		
+		s = socket(AF_INET, SOCK_STREAM)
+		s.connect((host, port))
+		handler = DPHandler(s)
 
+class DPHandler(BaseHandler):
+
+	LINE_TERMINATOR		= "\r\n"
+
+	def __init__(self, conn_sock):
+		BaseHandler.__init__(self, conn_sock)
+		self.handler = ''
+		self.send_data('LSIN 0 %s %s MD5 3.871 UTF8'%('ljsking@netsgo.com', self.digest()))
+		
 	def digest(self):
 		m = md5.new()
 		m.update('rjseka')
@@ -92,28 +78,6 @@ class DPLHandler(asynchat.async_chat):
 			data += '%02x'%ord(a)
 		return data
 		
-	def send_data(self, data):
-		log.debug("sending: [%s]" % data)
-		self.push(data+self.LINE_TERMINATOR)
-	
-	def handle_close(self):
-		log.info("conn_closed")
-		#asynchat.async_chat.handle_close(self)
-
-class DPHandler(asynchat.async_chat):
-
-	LINE_TERMINATOR		= "\r\n"
-
-	def __init__(self, conn_sock):
-		asynchat.async_chat.__init__(self, conn_sock)
-		self.ibuffer			= []
-		self.set_terminator(self.LINE_TERMINATOR)
-		self.handler = ''
-
-	def collect_incoming_data(self, data):
-		#log.debug("collect_incoming_data: [%s]" % data)
-		self.ibuffer.append(data)
-
 	def found_terminator(self):
 		if self.handler != '':
 			log.debug("found_terminator with handler")
@@ -147,18 +111,16 @@ class DPHandler(asynchat.async_chat):
 		log.debug("gotCONF with ")
 		log.debug(unicode(data,'utf-8'))
 
-	def send_data(self, data):
-		log.debug("sending: [%s]" % data)
-		self.push(data+self.LINE_TERMINATOR)
-
-	def handle_close(self):
-		log.info("conn_closed")
-		#asynchat.async_chat.handle_close(self)
+		
 class Runner(object):
 	def __init__(self):
-		c=Connection(DPLHandler)
-		c.connectToServer('dpl.nate.com', 5004)
-		c.sendCommand('PVER', '3.871 3.0 ko.linux\r\n')
+		s = socket(AF_INET, SOCK_STREAM)
+		s.connect(('dpl.nate.com', 5004))
+		dplHandler = DPLHandler(s)
+		
+		#c=Connection(DPLHandler)
+		#c.connectToServer('dpl.nate.com', 5004)
+		#c.sendCommand('PVER', '3.871 3.0 ko.linux\r\n')
 		asyncore.loop()
 
 runner = Runner()
