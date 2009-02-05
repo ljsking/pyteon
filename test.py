@@ -1,6 +1,8 @@
 import asynchat, asyncore
 import logging, md5
 from socket import *
+from MockClient import *
+from Buddy import *
 
 logging.basicConfig(level=logging.DEBUG, format="%(created)-15s %(levelname)8s %(thread)d %(name)s %(message)s")
 log						= logging.getLogger(__name__)
@@ -9,69 +11,74 @@ class BaseHandler(asynchat.async_chat):
 	
 	LINE_TERMINATOR		= "\r\n"
 	
-	def __init__(self, conn_sock):
+	def __init__(self, conn_sock, client):
 		asynchat.async_chat.__init__(self, conn_sock)
-		self.ibuffer			= []
+		self.ibuffer			= ""
 		self.set_terminator(self.LINE_TERMINATOR)
+		self.count = 0
+		self.client = client
+		
 	
 	def collect_incoming_data(self, data):
-		self.ibuffer.append(data)
+		self.ibuffer = self.ibuffer + data
 	
-	def send_data(self, data):
+	def send_data(self, command, data):
 		log.debug("sending: [%s]" % data)
-		self.push(data+self.LINE_TERMINATOR)
-
+		self.push('%s %d %s%s'%(command, self.count, data, self.LINE_TERMINATOR))
+		self.count+=1
+		
 	def handle_close(self):
 		log.info("conn_closed")
 		asynchat.async_chat.handle_close(self)
 		
 class DPLHandler(BaseHandler):
-	def __init__(self, conn_sock):
-		BaseHandler.__init__(self, conn_sock)
-		self.send_data('PVER 0 3.871 3.0 ko.linux')
+	def __init__(self, conn_sock, client):
+		BaseHandler.__init__(self, conn_sock, client)
+		self.send_data('PVER', '3.871 3.0 ko.linux')
 		
 	def found_terminator(self):
-		log.debug("found_terminator")
-		line = self.ibuffer[0]
-		command = line.split()[0]
+		#log.debug("found_terminator")
+		print self.ibuffer
+		data = self.ibuffer
+		self.ibuffer = ''
+		command = data[:data.find(" ")]
 		log.debug("command is " + command)
 		method = 'got' + command
 		if hasattr(self,method):
-			getattr(self,method)()
-		self.ibuffer = self.ibuffer[1:]
+			getattr(self,method)(data)
 		
-	def gotPVER(self):
+	def gotPVER(self, data):
 		log.debug("call gotPVER")
-		self.send_data('AUTH 1 AUTH')
+		self.send_data('AUTH', 'AUTH')
 		
-	def gotAUTH(self):
+	def gotAUTH(self, data):
 		log.debug("call gotAUTH")
-		self.send_data('REQS 2 DES ljsking@netsgo.com')
+		self.send_data('REQS', 'DES %s'%self.client.id)
 		
-	def gotREQS(self):
+	def gotREQS(self, data):
 		log.debug("call gotREQS")
-		tokens = self.ibuffer[0].split()
-		log.debug(tokens)
+		
+		tokens = data.split()
 		host = tokens[3]
 		port = int(tokens[4])
-		
 		s = socket(AF_INET, SOCK_STREAM)
 		s.connect((host, port))
-		handler = DPHandler(s)
+		handler = DPHandler(s, self.client)
 
 class DPHandler(BaseHandler):
 
 	LINE_TERMINATOR		= "\r\n"
 
-	def __init__(self, conn_sock):
-		BaseHandler.__init__(self, conn_sock)
+	def __init__(self, conn_sock, client):
+		BaseHandler.__init__(self, conn_sock, client)
 		self.handler = ''
-		self.send_data('LSIN 0 %s %s MD5 3.871 UTF8'%('ljsking@netsgo.com', self.digest()))
+		self.send_data('LSIN', '%s %s MD5 3.871 UTF8'%(self.client.id, self.digest()))
+		
 		
 	def digest(self):
 		m = md5.new()
-		m.update('rjseka')
-		m.update('ljsking@netsgo.com')
+		m.update(self.client.password)
+		m.update(self.client.id)
 		digest = m.digest()
 		data = ''
 		for a in digest:
@@ -79,17 +86,16 @@ class DPHandler(BaseHandler):
 		return data
 		
 	def found_terminator(self):
+		#print unicode(self.ibuffer,'utf-8')
 		if self.handler != '':
-			log.debug("found_terminator with handler")
 			method = self.handler
 			self.handler = ''
-			data = ''.join(self.ibuffer)
+			data = self.ibuffer
 			self.set_terminator(self.LINE_TERMINATOR)
-			self.ibuffer = []
+			self.ibuffer = ''
 		else:
-			log.debug("found_terminator")
-			data = self.ibuffer[0]
-			self.ibuffer=self.ibuffer[1:]
+			data = self.ibuffer
+			self.ibuffer=""
 			command = data[:data.find(" ")]
 			method = 'got' + command
 			if command == 'CONF':
@@ -105,22 +111,43 @@ class DPHandler(BaseHandler):
 			
 	def gotLSIN(self, data):
 		log.debug('gotLSIN')
-		self.send_data('CONF 1 0 0')
+		self.send_data('CONF', '0 0')
 		
 	def gotCONF(self, data):
 		log.debug("gotCONF with ")
-		log.debug(unicode(data,'utf-8'))
-
+		self.send_data('GLST', '3 0')
+		
+	def gotGLST(self, data):
+		tokens = data.split()
+		if 7 == len(tokens):
+			if tokens[4] == 'Y':
+				groupName=unicode(tokens[6],'utf-8')
+				id = int(tokens[5])
+				self.client.groups[id]=groupName
+			start = int(tokens[2])
+			end = int(tokens[3])
+			if start+1 == end:
+				self.send_data('LIST', '')
+				
+	def gotLIST(self, data):
+		tokens = data.split()
+		#logging.debug('%s'%unicode(data,'utf-8'))
+		if 19 == len(tokens):
+			groupID = int(tokens[4])
+			email = tokens[5]
+			name = unicode(tokens[7],'utf-8')
+			nick = unicode(tokens[8],'utf-8')
+			
+			id = int(tokens[6])
+			self.client.buddies[id]=Buddy(name,nick,email,groupID)
+			start = int(tokens[2])
+			end = int(tokens[3])
 		
 class Runner(object):
 	def __init__(self):
 		s = socket(AF_INET, SOCK_STREAM)
 		s.connect(('dpl.nate.com', 5004))
-		dplHandler = DPLHandler(s)
-		
-		#c=Connection(DPLHandler)
-		#c.connectToServer('dpl.nate.com', 5004)
-		#c.sendCommand('PVER', '3.871 3.0 ko.linux\r\n')
+		dplHandler = DPLHandler(s, MockClient())
 		asyncore.loop()
 
 runner = Runner()
