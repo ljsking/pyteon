@@ -83,3 +83,6 @@ class DPHandler(BaseHandler):
 			self.client.buddies[id]=Buddy(name,nick,email,groupID)
 			start = int(tokens[2])
 			end = int(tokens[3])
+			
+	def gotPING(self, data):
+		self.send_data( "PING", "" );

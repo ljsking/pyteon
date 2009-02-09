@@ -30,6 +30,8 @@ class PyteOn:
 		s.connect(('dpl.nate.com', 5004))
 		dplHandler = DPLHandler(s, self)
 		asyncore.loop()
+	def send_message(to, msg):
+		pass
 
 class PyteOnTests(unittest.TestCase):
 	def setUp(self):
